@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ROS2 / colcon build output
+build/
+install/
+log/
+
+# macOS
+.DS_Store
+
+# Model files
+*.pth
+*.pt
+*.onnx
+*.engine
+*.plan
+*.trt
+weights/
+
+# Videos and ROS2 bags
+recordings/
+video/
+*.mov
+*.MOV
+*.mp4
+*.MP4
+bags/
+*.db3
+*.mcap
+
+# Credentials
+*token*.txt
+*.token
+.env
+.env.*
+secrets/
