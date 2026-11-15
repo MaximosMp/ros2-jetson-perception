@@ -28,9 +28,39 @@ Everything runs in containers. The edge code stays compatible with the Python 3.
 
 | Part | State |
 |---|---|
+| Video source: a video file played as a camera | done |
 | ROS2 perception node (Python, C++) | in progress |
 | Jetson deployment and TensorRT benchmarks | planned |
 | Kubernetes service and CI/CD | planned |
+
+## Usage (so far)
+
+Everything runs in the official ROS2 Humble container, from the repository root:
+
+```bash
+docker run -it --rm -v "$PWD":/project -w /project/ros2_ws ros:humble-perception bash
+colcon build --symlink-install
+source install/setup.bash
+```
+
+**Play a video file as a camera.** Publishes `sensor_msgs/Image` on `/image_raw` at the video's frame rate, looping at the end:
+
+```bash
+ros2 run video_source video_publisher --ros-args -p video_path:=/project/my_clip.mp4 -p scale:=0.5
+```
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `video_path` | none (required) | Video file to play |
+| `scale` | `1.0` | Resize factor for width and height, e.g. `0.5` for half size |
+
+**Record it as a ROS2 bag**, a replayable recording of the topic. Raw frames are large: about 45 MiB per second at 960×540.
+
+```bash
+ros2 bag record -o /project/bags/my_clip /image_raw   # stop with Ctrl+C
+ros2 bag info /project/bags/my_clip
+ros2 bag play /project/bags/my_clip
+```
 
 ## Planned layout
 
