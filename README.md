@@ -29,6 +29,7 @@ Everything runs in containers. The edge code stays compatible with the Python 3.
 | Part | State |
 |---|---|
 | Video source: a video file played as a camera | done |
+| YOLOX-S export to ONNX, pre/post-processing | done |
 | ROS2 perception node (Python, C++) | in progress |
 | Jetson deployment and TensorRT benchmarks | planned |
 | Kubernetes service and CI/CD | planned |
@@ -60,6 +61,21 @@ ros2 run video_source video_publisher --ros-args -p video_path:=/project/my_clip
 ros2 bag record -o /project/bags/my_clip /image_raw   # stop with Ctrl+C
 ros2 bag info /project/bags/my_clip
 ros2 bag play /project/bags/my_clip
+```
+
+**Export the model to ONNX.** A one-off tool image with PyTorch and YOLOX downloads the weights and converts them:
+
+```bash
+docker build -t yolox-export model/
+docker run --rm -v "$PWD":/project yolox-export /project/model/export.sh s /project/models
+```
+
+`s` can be `nano`, `s` or `m`. The result is `models/yolox_s.onnx` (input `1×3×640×640`, output `1×8400×85`).
+
+**Check detection on one image.** Pre-processing, the ONNX model and post-processing in plain Python; writes `models/boxes.png`:
+
+```bash
+docker run --rm -v "$PWD":/project -w /project/models yolox-export python /project/model/check_detect.py
 ```
 
 ## Planned layout

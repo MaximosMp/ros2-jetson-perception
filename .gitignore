@@ -16,6 +16,7 @@ log/
 .DS_Store
 
 # Model files
+models/
 *.pth
 *.pt
 *.onnx
