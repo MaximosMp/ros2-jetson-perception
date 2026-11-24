@@ -3,6 +3,8 @@ import numpy as np
 
 INPUT_SIZE = 640
 PAD_VALUE = 114
+
+
 STRIDES = (8, 16, 32)
 
 
@@ -16,6 +18,7 @@ def preprocess(frame, size=INPUT_SIZE):
     chw = canvas.transpose(2, 0, 1)
     return chw[np.newaxis].astype(np.float32), scale
 
+
 def decode(rows, size=INPUT_SIZE):
     grids, strides = [], []
     for stride in STRIDES:
@@ -28,6 +31,7 @@ def decode(rows, size=INPUT_SIZE):
     centers = (rows[:, :2] + grid) * stride
     sizes = np.exp(rows[:, 2:4]) * stride
     return np.concatenate((centers - sizes / 2, centers + sizes / 2), axis=1)
+
 
 def nms(boxes, scores, threshold):
     areas = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])

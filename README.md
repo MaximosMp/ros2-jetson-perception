@@ -30,40 +30,16 @@ Everything runs in containers. The edge code stays compatible with the Python 3.
 |---|---|
 | Video source: a video file played as a camera | done |
 | YOLOX-S export to ONNX, pre/post-processing | done |
-| ROS2 perception node (Python, C++) | in progress |
+| ROS2 perception node in Python, live view in the browser | done |
+| ROS2 perception node in C++ | planned |
 | Jetson deployment and TensorRT benchmarks | planned |
 | Kubernetes service and CI/CD | planned |
 
 ## Usage (so far)
 
-Everything runs in the official ROS2 Humble container, from the repository root:
+All commands run from the repository root.
 
-```bash
-docker run -it --rm -v "$PWD":/project -w /project/ros2_ws ros:humble-perception bash
-colcon build --symlink-install
-source install/setup.bash
-```
-
-**Play a video file as a camera.** Publishes `sensor_msgs/Image` on `/image_raw` at the video's frame rate, looping at the end:
-
-```bash
-ros2 run video_source video_publisher --ros-args -p video_path:=/project/my_clip.mp4 -p scale:=0.5
-```
-
-| Parameter | Default | Meaning |
-|---|---|---|
-| `video_path` | none (required) | Video file to play |
-| `scale` | `1.0` | Resize factor for width and height, e.g. `0.5` for half size |
-
-**Record it as a ROS2 bag**, a replayable recording of the topic. Raw frames are large: about 45 MiB per second at 960×540.
-
-```bash
-ros2 bag record -o /project/bags/my_clip /image_raw   # stop with Ctrl+C
-ros2 bag info /project/bags/my_clip
-ros2 bag play /project/bags/my_clip
-```
-
-**Export the model to ONNX.** A one-off tool image with PyTorch and YOLOX downloads the weights and converts them:
+**1. Export the model to ONNX.** A one-off tool image with PyTorch and YOLOX downloads the weights and converts them:
 
 ```bash
 docker build -t yolox-export model/
@@ -72,17 +48,63 @@ docker run --rm -v "$PWD":/project yolox-export /project/model/export.sh s /proj
 
 `s` can be `nano`, `s` or `m`. The result is `models/yolox_s.onnx` (input `1×3×640×640`, output `1×8400×85`).
 
-**Check detection on one image.** Pre-processing, the ONNX model and post-processing in plain Python; writes `models/boxes.png`:
+**2. Build the development image and the workspace.** ROS2 Humble plus ONNX Runtime, `vision_msgs` and `web_video_server`:
+
+```bash
+docker build -t ros2-perception-dev ros2_ws/
+docker run -it --rm -p 127.0.0.1:8080:8080 -v "$PWD":/project -w /project/ros2_ws ros2-perception-dev bash
+colcon build --symlink-install
+source install/setup.bash
+```
+
+**3. Run the demo.** One launch file starts the video source, the detector, the visualizer and a web server for the live view:
+
+```bash
+ros2 launch perception_py demo.launch.py video:=/project/my_clip.mp4
+```
+
+Watch the result at http://localhost:8080/stream_viewer?topic=/detections/image
+
+```mermaid
+flowchart LR
+    V["video_publisher"] -->|"/image_raw"| D["detector"]
+    D -->|"/detections"| Z["visualizer"]
+    V -->|"/image_raw"| Z
+    Z -->|"/detections/image"| W["web_video_server"]
+```
+
+| Node | Package | Does |
+|---|---|---|
+| `video_publisher` | `video_source` | Plays a video file as a camera: `sensor_msgs/Image` on `/image_raw`, looping |
+| `detector` | `perception_py` | Letterbox to 640×640 → YOLOX (ONNX Runtime) → decode + per-class NMS → `vision_msgs/Detection2DArray` on `/detections`; logs the average time per frame |
+| `visualizer` | `perception_py` | Pairs each frame with its detections by timestamp and draws the boxes on `/detections/image` |
+| `web_video_server` | ROS2 | Serves image topics to the browser |
+
+| Launch argument | Default | Meaning |
+|---|---|---|
+| `video` | none (required) | Video file to play |
+| `scale` | `1.0` | Resize factor for the video frames, e.g. `0.5` |
+| `model` | `/project/models/yolox_s.onnx` | ONNX model |
+
+**Record the camera topic as a ROS2 bag**, a replayable recording. Raw frames are large: about 45 MiB per second at 960×540.
+
+```bash
+ros2 run video_source video_publisher --ros-args -p video_path:=/project/my_clip.mp4 -p scale:=0.5
+ros2 bag record -o /project/bags/my_clip /image_raw   # in a second terminal; stop with Ctrl+C
+ros2 bag play /project/bags/my_clip
+```
+
+**Check detection on one image**, without ROS2. Writes `models/boxes.png`:
 
 ```bash
 docker run --rm -v "$PWD":/project -w /project/models yolox-export python /project/model/check_detect.py
 ```
 
-## Planned layout
+## Layout
 
 ```
-model/        model export and shared pre/post-processing
-ros2_ws/src/  ROS2 packages: video source, Python and C++ nodes, launch files
+model/        model export, single-image check
+ros2_ws/      development Dockerfile; src/: ROS2 packages (video source, Python and C++ nodes, launch files)
 jetson/       Jetson container, engine builds, benchmarks
 service/      HTTP inference service
 k8s/          Kubernetes manifests

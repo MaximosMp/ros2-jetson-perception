@@ -10,7 +10,9 @@ import sys
 import cv2
 import onnxruntime as ort
 
-from processing import postprocess, preprocess
+# pre/post-processing lives in the ROS2 package; it needs only NumPy and OpenCV
+sys.path.insert(0, '/project/ros2_ws/src/perception_py')
+from perception_py.processing import postprocess, preprocess  # noqa: E402
 
 # COCO class names, read straight from YOLOX's source file
 spec = importlib.util.spec_from_file_location(
